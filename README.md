@@ -11,6 +11,8 @@ for frontend refer https://github.com/VarshithPawarHR/Gene-Expression-Explorer-D
 
 # Note: This is microservice for the above repository
 
+# Note: The one service hosted is currently on free trial if you try to load a large dataset it will crash please load it in local system by cloning this repo!! Thank you
+
 
 ## Project Branches
 *   **`main` branch**: Contains the **Flask backend server**.
