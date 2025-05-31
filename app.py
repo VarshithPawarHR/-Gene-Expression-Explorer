@@ -8,6 +8,9 @@ from GEOparse import get_GEO
 import io
 import zipfile
 from PIL import Image
+import os 
+os.environ['GEOPARSE_USE_HTTP_FOR_FTP'] = 'yes'
+
 
 st.set_page_config(layout="wide")
 
