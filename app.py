@@ -3,8 +3,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import zscore, ttest_ind
+from scipy.stats import zscore, ttest_ind, levene, shapiro, mannwhitneyu, kruskal
 from GEOparse import get_GEO
+import io
+import zipfile
+from PIL import Image
 
 st.set_page_config(layout="wide")
 
@@ -54,9 +57,23 @@ if dataset_id:
     if len(labels) == 2:
         group1 = df[df['label'] == labels[0]][gene]
         group2 = df[df['label'] == labels[1]][gene]
-        stat, pval = ttest_ind(group1, group2, equal_var=False)
-        st.markdown(f"**T-test between {labels[0]} and {labels[1]}:**")
-        st.markdown(f"T-statistic = `{stat:.3f}`, p-value = `{pval:.4g}`")
+
+        stat_t, pval_t = ttest_ind(group1, group2, equal_var=False)
+        stat_mw, pval_mw = mannwhitneyu(group1, group2)
+        stat_levene, pval_levene = levene(group1, group2)
+        pval_shapiro1 = shapiro(group1)[1]
+        pval_shapiro2 = shapiro(group2)[1]
+
+        st.markdown(f"**T-test between {labels[0]} and {labels[1]}:** T = `{stat_t:.3f}`, p = `{pval_t:.4g}`")
+        st.markdown(f"**Mann-Whitney U Test:** U = `{stat_mw:.3f}`, p = `{pval_mw:.4g}`")
+        st.markdown(f"**Levene's Test for Equal Variance:** Statistic = `{stat_levene:.3f}`, p = `{pval_levene:.4g}`")
+        st.markdown("**Shapiro-Wilk Normality Test:**")
+        st.markdown(f"{labels[0]}: p = `{pval_shapiro1:.4g}`")
+        st.markdown(f"{labels[1]}: p = `{pval_shapiro2:.4g}`")
+    elif len(labels) > 2:
+        grouped = [df[df['label'] == label][gene] for label in labels]
+        stat_kruskal, pval_kruskal = kruskal(*grouped)
+        st.markdown(f"**Kruskal-Wallis Test among groups:** Statistic = `{stat_kruskal:.3f}`, p = `{pval_kruskal:.4g}`")
 
     st.subheader(f"📈 Expression Visualizations for Gene: `{gene}`")
 
@@ -129,5 +146,40 @@ if dataset_id:
         st.pyplot(fig9)
     except Exception as e:
         st.warning(f"Pairplot could not be displayed: {e}")
+
+    # Download section
+    st.subheader("📥 Download Options")
+
+    # Data CSV download
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+    st.download_button("📄 Download Full Data as CSV", csv_buffer.getvalue(), file_name=f"{dataset_id}_data.csv", mime="text/csv")
+
+    # Chart image downloads
+    st.markdown("📸 Download All Charts")
+    chart_buffers = []
+
+    for i, fig in enumerate([fig1, fig2, fig3, fig4, fig5, fig6, fig7, fig8]):
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+        buf.seek(0)
+        chart_buffers.append((f"chart_{i+1}.png", buf.read()))
+
+    if 'fig9' in locals():
+        try:
+            buf = io.BytesIO()
+            fig9.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+            buf.seek(0)
+            chart_buffers.append(("chart_9_pairplot.png", buf.read()))
+        except Exception as e:
+            st.warning("Failed to export pairplot.")
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zipf:
+        for filename, content in chart_buffers:
+            zipf.writestr(filename, content)
+    zip_buffer.seek(0)
+
+    st.download_button("🖼️ Download All Charts as ZIP", zip_buffer, file_name=f"{dataset_id}_charts.zip", mime="application/zip")
 else:
     st.warning("Please enter a GEO dataset ID to begin.")
